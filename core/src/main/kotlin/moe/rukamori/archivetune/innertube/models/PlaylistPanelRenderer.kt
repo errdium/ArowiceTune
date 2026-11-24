@@ -1,0 +1,48 @@
+/*
+ * ArchiveTune (2026)
+ * © Rukamori — github.com/rukamori
+ * GPL-3.0 License | Contributors: see git history
+ * Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
+ */
+
+package moe.rukamori.archivetune.innertube.models
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class PlaylistPanelRenderer(
+    val title: String?,
+    val titleText: Runs?,
+    val shortBylineText: Runs?,
+    val contents: List<Content>,
+    val isInfinite: Boolean?,
+    val numItemsToShow: Int?,
+    val playlistId: String?,
+    val continuations: List<Continuation>?,
+) {
+    @Serializable
+    data class Content(
+        val playlistPanelVideoRenderer: PlaylistPanelVideoRenderer?,
+        val playlistPanelVideoWrapperRenderer: PlaylistPanelVideoWrapperRenderer? = null,
+        val automixPreviewVideoRenderer: AutomixPreviewVideoRenderer?,
+    ) {
+        val primaryVideoRenderer: PlaylistPanelVideoRenderer?
+            get() = playlistPanelVideoRenderer ?: playlistPanelVideoWrapperRenderer?.primaryRenderer?.playlistPanelVideoRenderer
+    }
+}
+
+@Serializable
+data class PlaylistPanelVideoWrapperRenderer(
+    val primaryRenderer: Renderer? = null,
+    val counterpart: List<Counterpart>? = null,
+) {
+    @Serializable
+    data class Renderer(
+        val playlistPanelVideoRenderer: PlaylistPanelVideoRenderer? = null,
+    )
+
+    @Serializable
+    data class Counterpart(
+        val counterpartRenderer: Renderer? = null,
+    )
+}
