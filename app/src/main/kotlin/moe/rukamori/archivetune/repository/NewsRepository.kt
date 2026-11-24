@@ -13,7 +13,9 @@ import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import io.ktor.http.isSuccess
 import kotlinx.serialization.json.Json
+import moe.rukamori.archivetune.BuildConfig
 import moe.rukamori.archivetune.models.NewsItem
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -52,6 +54,7 @@ class NewsRepository
                         append(HttpHeaders.Expires, "0")
                     }
                 }
+            check(response.status.isSuccess()) { "Failed to fetch news: HTTP ${response.status.value}" }
             val text = response.bodyAsText()
             val items = json.decodeFromString<List<NewsItem>>(text)
             metadataCache = items
@@ -67,15 +70,16 @@ class NewsRepository
                         append(HttpHeaders.Expires, "0")
                     }
                 }
+            check(response.status.isSuccess()) { "Failed to fetch news article: HTTP ${response.status.value}" }
             return response.bodyAsText()
         }
 
         fun getCachedItem(id: String): NewsItem? = metadataCache?.find { it.id == id }
 
         private companion object {
-            const val METADATA_URL =
-                "https://raw.githubusercontent.com/koiverse/ArchiveTuneNewsRepository/main/metadata.json"
-            const val CONTENT_BASE_URL =
-                "https://raw.githubusercontent.com/koiverse/ArchiveTuneNewsRepository/main/content/"
+            const val NEWS_BASE_URL =
+                "https://raw.githubusercontent.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/main/news"
+            const val METADATA_URL = "$NEWS_BASE_URL/metadata.json"
+            const val CONTENT_BASE_URL = "$NEWS_BASE_URL/content/"
         }
     }

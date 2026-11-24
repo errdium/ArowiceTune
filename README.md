@@ -2,6 +2,11 @@
 >
 > Build the Android ARM64 APK with JDK 21 and the Android SDK using `./gradlew :app:assembleGmsMobileArm64Debug`. The required source modules are included in this archive.
 
+### ArowiceTune releases and developer news
+
+- Publish a GitHub Release with a tag such as `v16.1.2`. Increase both the Android version name and version code, sign the ARM64 build with the same key, and attach it as `ArowiceTune.apk`.
+- To post news, add a Markdown file to `news/content/` and an entry in `news/metadata.json` on `main`. Use the exact filename as `id`, set `Author` to your display name, and use Unix seconds for `Date`.
+
 <div align="center">
 
   <img src="https://github.com/rukamori/ArchiveTune/blob/main/fastlane/metadata/android/en-US/images/icon.png" width="160" height="160" alt="ArowiceTune Logo" style="border-radius: 22%">

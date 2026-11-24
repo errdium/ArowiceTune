@@ -1011,11 +1011,6 @@ val GitHubContributorsLastCheckedAtKey = longKey("github_contributors_last_check
 val GitHubTranslationContributorsJsonKey = stringKey("github_translation_contributors_json")
 val GitHubTranslationContributorsLastCheckedAtKey = longKey("github_translation_contributors_last_checked_at")
 
-val GitHubReleasesEtagKey = stringKey("github_releases_etag")
-val GitHubReleasesJsonKey = stringKey("github_releases_json")
-val GitHubReleasesLastCheckedAtKey = longKey("github_releases_last_checked_at")
-val GitHubReleasesFingerprintKey = stringKey("github_releases_fingerprint")
-
 val TogetherOnlineEndpointCacheKey = stringKey("together_online_endpoint_cache")
 val TogetherOnlineEndpointLastCheckedAtKey = longKey("together_online_endpoint_last_checked_at")
 

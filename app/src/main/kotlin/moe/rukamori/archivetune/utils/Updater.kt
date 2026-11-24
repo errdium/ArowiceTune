@@ -9,6 +9,8 @@ package moe.rukamori.archivetune.utils
 
 import android.net.Uri
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.timeout
@@ -20,10 +22,6 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
 import moe.rukamori.archivetune.App
 import moe.rukamori.archivetune.BuildConfig
-import moe.rukamori.archivetune.constants.GitHubReleasesEtagKey
-import moe.rukamori.archivetune.constants.GitHubReleasesFingerprintKey
-import moe.rukamori.archivetune.constants.GitHubReleasesJsonKey
-import moe.rukamori.archivetune.constants.GitHubReleasesLastCheckedAtKey
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -63,7 +61,12 @@ object Updater {
     private val releaseRepo: String
         get() = BuildConfig.RELEASE_GITHUB_REPO
 
-    private const val CommitHistoryBaseUrl = "https://api.github.com/repos/rukamori/ArchiveTune"
+    private val releaseApiBaseUrl = "https://api.github.com/repos/$releaseOwner/$releaseRepo"
+    private val releaseCachePrefix = "github_releases_${releaseOwner}_${releaseRepo}"
+    private val releaseEtagKey = stringPreferencesKey("${releaseCachePrefix}_etag")
+    private val releaseFingerprintKey = stringPreferencesKey("${releaseCachePrefix}_fingerprint")
+    private val releaseJsonKey = stringPreferencesKey("${releaseCachePrefix}_json")
+    private val releaseLastCheckedAtKey = longPreferencesKey("${releaseCachePrefix}_last_checked_at")
 
     private val stableReleaseBaseUrl: String
         get() = "https://github.com/$releaseOwner/$releaseRepo/releases"
@@ -92,7 +95,11 @@ object Updater {
             }
 
     private fun stableReleaseArtifactName(): String =
-        "app-$releaseArtifactPrefix${BuildConfig.DEVICE}-${BuildConfig.ARCHITECTURE}-release.apk"
+        if (BuildConfig.DISTRIBUTION == "gms" && BuildConfig.DEVICE == "mobile" && BuildConfig.ARCHITECTURE == "arm64") {
+            "ArowiceTune.apk"
+        } else {
+            "app-$releaseArtifactPrefix${BuildConfig.DEVICE}-${BuildConfig.ARCHITECTURE}-release.apk"
+        }
 
     private data class SemVer(
         val major: Int,
@@ -295,7 +302,7 @@ object Updater {
             }
             val versionName = parseSemVerOrNull(version)?.normalizedName() ?: version.trim().removePrefix("v")
             for (tag in listOf("v$versionName", versionName)) {
-                val response = client.get("https://api.github.com/repos/$releaseOwner/$releaseRepo/releases/tags/${Uri.encode(tag)}") {
+                val response = client.get("$releaseApiBaseUrl/releases/tags/${Uri.encode(tag)}") {
                     headers {
                         append("Accept", "application/vnd.github+json")
                         append("User-Agent", "ArowiceTune")
@@ -328,7 +335,7 @@ object Updater {
         cachedEtag: String?,
     ): ReleasesNetworkResult {
         val response: HttpResponse =
-            client.get("https://api.github.com/repos/$releaseOwner/$releaseRepo/releases?per_page=$perPage") {
+            client.get("$releaseApiBaseUrl/releases?per_page=$perPage") {
                 timeout { requestTimeoutMillis = 10_000 }
                 headers {
                     append("Accept", "application/vnd.github+json")
@@ -363,7 +370,7 @@ object Updater {
             return emptyList()
         }
 
-        val cachedJson = App.instance.dataStore.getAsync(GitHubReleasesJsonKey)
+        val cachedJson = App.instance.dataStore.getAsync(releaseJsonKey)
         return cachedJson
             ?.takeIf { it.isNotBlank() }
             ?.let { runCatching { parseReleasesJson(it, stableReleaseArtifactName()) }.getOrNull() }
@@ -392,7 +399,7 @@ object Updater {
 
     suspend fun getCommitHistory(
         count: Int = 20,
-        branch: String = "dev",
+        branch: String = "main",
     ): Result<List<GitCommit>> =
         runCatchingCancellable {
             if (!isUpdaterDistribution) {
@@ -401,7 +408,7 @@ object Updater {
 
             val response =
                 client
-                    .get("$CommitHistoryBaseUrl/commits?sha=$branch&per_page=$count")
+                    .get("$releaseApiBaseUrl/commits?sha=${Uri.encode(branch)}&per_page=$count")
                     .bodyAsText()
             val jsonArray = JSONArray(response)
             val commits = mutableListOf<GitCommit>()
@@ -461,10 +468,10 @@ object Updater {
 
         return runCatchingCancellable {
             val now = System.currentTimeMillis()
-            val cachedJson = App.instance.dataStore.getAsync(GitHubReleasesJsonKey)
-            val cachedEtag = App.instance.dataStore.getAsync(GitHubReleasesEtagKey)
-            val lastCheckedAt = App.instance.dataStore.getAsync(GitHubReleasesLastCheckedAtKey, 0L)
-            val cachedFingerprint = App.instance.dataStore.getAsync(GitHubReleasesFingerprintKey)
+            val cachedJson = App.instance.dataStore.getAsync(releaseJsonKey)
+            val cachedEtag = App.instance.dataStore.getAsync(releaseEtagKey)
+            val lastCheckedAt = App.instance.dataStore.getAsync(releaseLastCheckedAtKey, 0L)
+            val cachedFingerprint = App.instance.dataStore.getAsync(releaseFingerprintKey)
 
             val cachedReleases =
                 cachedJson
@@ -504,8 +511,8 @@ object Updater {
             when {
                 networkResult.status == HttpStatusCode.NotModified -> {
                     App.instance.dataStore.edit { settings ->
-                        settings[GitHubReleasesLastCheckedAtKey] = now
-                        networkResult.etag?.let { settings[GitHubReleasesEtagKey] = it }
+                        settings[releaseLastCheckedAtKey] = now
+                        networkResult.etag?.let { settings[releaseEtagKey] = it }
                     }
                     val fallback = cachedReleases
                     if (fallback != null) {
@@ -523,11 +530,11 @@ object Updater {
                     val hasTopReleaseChanged = cachedFingerprint != newFingerprint
 
                     App.instance.dataStore.edit { settings ->
-                        settings[GitHubReleasesLastCheckedAtKey] = now
-                        networkResult.etag?.let { settings[GitHubReleasesEtagKey] = it }
+                        settings[releaseLastCheckedAtKey] = now
+                        networkResult.etag?.let { settings[releaseEtagKey] = it }
                         if (hasPayloadChanged || hasTopReleaseChanged || cachedJson.isNullOrBlank()) {
-                            settings[GitHubReleasesJsonKey] = networkBody
-                            settings[GitHubReleasesFingerprintKey] = newFingerprint
+                            settings[releaseJsonKey] = networkBody
+                            settings[releaseFingerprintKey] = newFingerprint
                         }
                     }
                     lastCheckTime = now
