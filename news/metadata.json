@@ -13,7 +13,7 @@
     "Title": "Новости и обновления ArowiceTune",
     "Description": "У ArowiceTune теперь свой канал новостей и обновлений.",
     "ImageURL": [],
-    "Important": true,
+    "Important": false,
     "Author": "arowice",
     "Date": 1795494240
   }
